@@ -32,7 +32,7 @@ def create_keybindings(state: UIState, controller, cmd_widget, detail_window=Non
     def get_page_size():
         """Get page size from render_info, or default"""
         if detail_window and detail_window.render_info:
-            return max(10, detail_window.render_info.window_height - 2)
+            return max(1, detail_window.render_info.window_height - 2)
         return 40
 
     # Movement: j/k and arrow keys for up/down navigation

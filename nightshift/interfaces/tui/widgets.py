@@ -14,6 +14,12 @@ def _truncate(text: str, max_len: int) -> str:
     return text[:max_len - 3] + "..."
 
 
+def _append_lines(lines: list, style: str, text: str) -> None:
+    """Append text as separate lines (one tuple per line for accurate counting)"""
+    for line in text.split('\n'):
+        lines.append((style, line + '\n'))
+
+
 class TaskListControl(FormattedTextControl):
     """Control for displaying the task list"""
 
@@ -96,7 +102,7 @@ class DetailControl(FormattedTextControl):
         visible_lines = content_lines[offset:offset + visible_height]
 
         # Store total for scroll indicators
-        self.state._content_line_count = total_lines
+        self.state.content_line_count = total_lines
 
         # Return tab bar + visible slice
         return tab_bar + visible_lines
@@ -106,7 +112,8 @@ class DetailControl(FormattedTextControl):
         lines = []
 
         if tab == "overview":
-            lines.append(("bold", f"Task: {st.task_id}\n\n"))
+            lines.append(("bold", f"Task: {st.task_id}\n"))
+            lines.append(("", "\n"))
 
             # Status with emoji and color
             status = st.details.get('status', 'unknown').upper()
@@ -130,8 +137,8 @@ class DetailControl(FormattedTextControl):
             }
             emoji = status_emojis.get(status, "❓")
             status_color = status_colors.get(status, "white")
-            lines.append(("", "Status: "))
-            lines.append((status_color, f"{emoji} {status}\n\n"))
+            lines.append((status_color, f"Status: {emoji} {status}\n"))
+            lines.append(("", "\n"))
 
             # Timestamps
             lines.append(("", f"Created: {st.details.get('created_at', 'N/A')}\n"))
@@ -145,17 +152,21 @@ class DetailControl(FormattedTextControl):
                 lines.append(("", f"Result Path: {st.details['result_path']}\n"))
 
             # Description
-            lines.append(("", f"\nDescription:\n{st.details.get('description', 'N/A')}\n"))
+            lines.append(("", "\n"))
+            lines.append(("", "Description:\n"))
+            _append_lines(lines, "", st.details.get('description', 'N/A'))
 
             # Estimates
             if st.details.get('estimated_tokens'):
-                lines.append(("", f"\nEstimated Tokens: {st.details['estimated_tokens']}\n"))
+                lines.append(("", "\n"))
+                lines.append(("", f"Estimated Tokens: {st.details['estimated_tokens']}\n"))
             if st.details.get('estimated_time'):
                 lines.append(("", f"Estimated Time: {st.details['estimated_time']}s\n"))
 
             # Allowed tools
             if st.details.get('allowed_tools'):
-                lines.append(("", f"\nAllowed Tools:\n"))
+                lines.append(("", "\n"))
+                lines.append(("", "Allowed Tools:\n"))
                 for tool in st.details['allowed_tools']:
                     lines.append(("", f"  • {tool}\n"))
 
@@ -163,24 +174,28 @@ class DetailControl(FormattedTextControl):
             allowed_dirs = st.details.get('allowed_directories', [])
             needs_git = st.details.get('needs_git', False)
             if allowed_dirs or needs_git:
-                lines.append(("", f"\nSandbox (write access):\n"))
+                lines.append(("", "\n"))
+                lines.append(("", "Sandbox (write access):\n"))
                 for d in allowed_dirs:
                     lines.append(("", f"  • {d}\n"))
                 lines.append(("", f"(needs_git: {needs_git})\n"))
 
             # Error message
             if st.details.get('error_message'):
-                lines.append(("", f"\nError:\n"))
-                lines.append(("red", f"{st.details['error_message']}\n"))
+                lines.append(("", "\n"))
+                lines.append(("", "Error:\n"))
+                _append_lines(lines, "red", st.details['error_message'])
 
             # System prompt snippet
             if st.details.get('system_prompt'):
                 snippet = _truncate(st.details['system_prompt'], 500)
-                lines.append(("", f"\nSystem Prompt:\n"))
-                lines.append(("class:dim", f"{snippet}\n"))
+                lines.append(("", "\n"))
+                lines.append(("", "System Prompt:\n"))
+                _append_lines(lines, "class:dim", snippet)
 
         elif tab == "exec":
-            lines.append(("class:heading", "📋 Execution Log\n\n"))
+            lines.append(("class:heading", "📋 Execution Log\n"))
+            lines.append(("", "\n"))
             if st.exec_snippet:
                 # Parse and colorize execution log
                 for line in st.exec_snippet.split("\n"):
@@ -202,7 +217,8 @@ class DetailControl(FormattedTextControl):
                 lines.append(("class:dim", "No execution log available\n"))
 
         elif tab == "files":
-            lines.append(("class:heading", "📁 File Changes\n\n"))
+            lines.append(("class:heading", "📁 File Changes\n"))
+            lines.append(("", "\n"))
             fi = st.files_info
 
             if not fi:
@@ -234,10 +250,12 @@ class DetailControl(FormattedTextControl):
         elif tab == "summary":
             info = st.summary_info
             if not info:
-                lines.append(("bold", "Task Summary\n\n"))
+                lines.append(("bold", "Task Summary\n"))
+                lines.append(("", "\n"))
                 lines.append(("class:dim", "No summary available\n"))
             else:
-                lines.append(("class:heading", "📊 Task Summary\n\n"))
+                lines.append(("class:heading", "📊 Task Summary\n"))
+                lines.append(("", "\n"))
 
                 # --- Status header (SUCCESS/FAILED/CANCELLED/etc) ---
                 raw_status = (info.get("status") or "").lower()
@@ -253,13 +271,14 @@ class DetailControl(FormattedTextControl):
                     status_text, status_emoji, status_color = raw_status.upper() or "UNKNOWN", "❓", ""
 
                 task_id = info.get('task_id', st.task_id)
-                header = f"{status_emoji} Task {status_text}: {task_id}\n\n"
-                lines.append((status_color, header))
+                lines.append((status_color, f"{status_emoji} Task {status_text}: {task_id}\n"))
+                lines.append(("", "\n"))
 
                 # --- What you asked for ---
                 lines.append(("class:section-title", "🎯 What you asked for\n"))
                 lines.append(("", "-" * 40 + "\n"))
-                lines.append(("", _truncate(info.get("description", "No description"), 500) + "\n\n"))
+                _append_lines(lines, "", _truncate(info.get("description", "No description"), 500))
+                lines.append(("", "\n"))
 
                 # --- What NightShift found/created ---
                 if info.get("claude_summary"):
@@ -332,7 +351,8 @@ class DetailControl(FormattedTextControl):
                     lines.append(("class:error-codeblock", "┌─ error ───────────────────────────────\n"))
                     for line in _truncate(info["error_message"], 300).splitlines():
                         lines.append(("class:error-codeblock", f"│ {line}\n"))
-                    lines.append(("class:error-codeblock", "└───────────────────────────────────────\n\n"))
+                    lines.append(("class:error-codeblock", "└───────────────────────────────────────\n"))
+                    lines.append(("", "\n"))
 
                 # --- Result path ---
                 if info.get("result_path"):
@@ -356,7 +376,7 @@ class StatusBarControl(FormattedTextControl):
 
         # Get scroll info from state (set by DetailControl during render)
         scroll_info = ""
-        total = getattr(self.state, '_content_line_count', 0)
+        total = self.state.content_line_count
         offset = self.state.detail_scroll_offset
         visible = 40  # Default
         if self.state.detail_window and self.state.detail_window.render_info:

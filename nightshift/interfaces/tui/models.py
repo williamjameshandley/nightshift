@@ -59,8 +59,9 @@ class UIState:
 
     selected_task: SelectedTaskState = field(default_factory=SelectedTaskState)
 
-    # Window reference for scroll info (set after layout creation)
-    detail_window: Optional["Window"] = None
+    # Scroll state
+    content_line_count: int = 0               # total lines in detail panel (set by DetailControl)
+    detail_window: Optional["Window"] = None  # Window reference for render_info
 
 
 def task_to_row(task) -> TaskRow:
